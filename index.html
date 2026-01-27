@@ -13,14 +13,11 @@
     <div id="info">
         <span style="color:white; font-weight:bold;">SYSTEM READY</span><br>
         Show Hand to Activate.<br>
-        ✊ Fist: Heart<br>
-        ☝️ Point: DNA<br>
-        ✌️ Peace: Cube<br>
-        🖐️ Open: Saturn
+        ☝️ Point: Attract Particles
     </div>
+    <video id="input_video"></video>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
     <script type="importmap">
@@ -30,7 +27,100 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- 1. HD TEXTURE (Base64 Spark) ---
-        // A sharp, hard-edged circle for better definition
+        // --- 1. THREE.JS SCENE SETUP ---
+        const scene = new THREE.Scene();
+        const camera3D = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-        const sparkTexture = new THREE.TextureLoader().load('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAHgCAYAAADwcCZJAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+/PxhSCxEAAAGYSURBVHja7NkxTxRBFIbhZwUJkMpo7IxG40/wQlMTCy208U9orY2JhZa2JhZaaOOf0MTCaDQ2SiqTkAm7M3uH2R12N7PZ2X1v8u1i9jVv8s3szu6sXq/XGq61C9iEO/C+4W+8gUfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8g')
+        camera3D.position.z = 5;
+
+        // --- 2. INITIALIZE PARTICLES ---
+        const particleCount = 5000;
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount * 3; i++) {
+            positions[i] = (Math.random() - 0.5) * 10;
+            colors[i] = Math.random();
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        
+        const material = new THREE.PointsMaterial({ 
+            size: 0.05, 
+            vertexColors: true, 
+            transparent: true, 
+            opacity: 0.8 
+        });
+        
+        const particleSystem = new THREE.Points(geometry, material);
+        scene.add(particleSystem);
+
+        // --- 3. MEDIAPIPE HANDS SETUP ---
+        const videoElement = document.getElementById('input_video');
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        hands.onResults((results) => {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const hand = results.multiHandLandmarks[0];
+                const indexTip = hand[8];
+                
+                // Map MediaPipe (0 to 1) to Three.js (-5 to 5)
+                const targetX = (indexTip.x - 0.5) * 10;
+                const targetY = -(indexTip.y - 0.5) * 10;
+
+                updateParticles(targetX, targetY);
+            }
+        });
+
+        // --- 4. DYNAMIC BEHAVIOR ---
+        function updateParticles(tx, ty) {
+            const posAttribute = geometry.attributes.position;
+            for (let i = 0; i < particleCount; i++) {
+                let ix = i * 3;
+                // Simple easing movement towards the finger
+                posAttribute.array[ix] += (tx - posAttribute.array[ix]) * 0.05;
+                posAttribute.array[ix+1] += (ty - posAttribute.array[ix+1]) * 0.05;
+            }
+            posAttribute.needsUpdate = true;
+        }
+
+        // --- 5. CAMERA & ANIMATION LOOP ---
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({image: videoElement});
+            },
+            width: 1280,
+            height: 720
+        });
+        camera.start();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            particleSystem.rotation.y += 0.002; // Subtle drift
+            renderer.render(scene, camera3D);
+        }
+        animate();
+
+        // Handle Resize
+        window.addEventListener('resize', () => {
+            camera3D.aspect = window.innerWidth / window.innerHeight;
+            camera3D.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
