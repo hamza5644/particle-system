@@ -1,60 +1,123 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Three.js Hand Tracker - Hamza</title>
+    <title>Hamza's Hand-Tracked Particles</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #111; }
-        canvas { display: block; }
-        #info { position: absolute; top: 10px; left: 10px; color: white; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        #canvas-container { position: relative; width: 100vw; height: 100vh; }
+        video { transform: scaleX(-1); position: absolute; width: 200px; bottom: 10px; right: 10px; border: 2px solid #333; border-radius: 8px; }
+        #gui { position: absolute; top: 10px; left: 10px; color: cyan; pointer-events: none; }
     </style>
 </head>
 <body>
-    <div id="info">If you see a spinning cube, Three.js is working!</div>
-    
+    <div id="gui">
+        Hand: <span id="status">Searching...</span><br>
+        Gesture: <span id="gesture">None</span>
+    </div>
+    <video id="input_video"></video>
+    <div id="canvas-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-            }
-        }
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
     </script>
 
     <script type="module">
         import * as THREE from 'three';
 
-        // 1. Scene Setup
+        // --- 1. THREE.JS SCENE SETUP ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
-        
         renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-
-        // 2. Add a Test Object (A Cube)
-        const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
-        const cube = new THREE.Mesh(geometry, material);
-        scene.add(cube);
-
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
         camera.position.z = 5;
 
-        // 3. THE ANIMATION LOOP (This is usually what's missing!)
-        function animate() {
-            requestAnimationFrame(animate);
+        // --- 2. PARTICLE SYSTEM ---
+        const particleCount = 3000;
+        const geo = new THREE.BufferGeometry();
+        const posArray = new Float32Array(particleCount * 3);
+        const colorArray = new Float32Array(particleCount * 3);
 
-            // Rotate cube for visual feedback
-            cube.rotation.x += 0.01;
-            cube.rotation.y += 0.01;
+        for(let i=0; i < particleCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 10;
+        
+        geo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
 
-            renderer.render(scene, camera);
+        const mat = new THREE.PointsMaterial({ 
+            size: 0.04, 
+            vertexColors: true, 
+            blending: THREE.AdditiveBlending,
+            transparent: true 
+        });
+        const points = new THREE.Points(geo, mat);
+        scene.add(points);
+
+        // --- 3. HAND TRACKING LOGIC ---
+        const videoElement = document.getElementById('input_video');
+        const statusText = document.getElementById('status');
+        const gestureText = document.getElementById('gesture');
+        let targetPos = { x: 0, y: 0, z: 0 };
+        let spread = 1;
+
+        function onResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                statusText.innerText = "Detected";
+                const hand = results.multiHandLandmarks[0];
+                
+                // Track Index Finger Tip (Landmark 8)
+                targetPos.x = (hand[8].x - 0.5) * -15; // Invert X for mirroring
+                targetPos.y = (hand[8].y - 0.5) * -10;
+
+                // GESTURE: Expansion (Distance between Thumb (4) and Index (8))
+                const dx = hand[4].x - hand[8].x;
+                const dy = hand[4].y - hand[8].y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                spread = dist * 20; 
+
+                gestureText.innerText = dist > 0.15 ? "EXPAND" : "CONTRACT";
+            } else {
+                statusText.innerText = "Hidden";
+            }
         }
 
-        // Handle Window Resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+
+        const cam = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 640, height: 480
         });
+        cam.start();
+
+        // --- 4. ANIMATION & MATH ---
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const positions = geo.attributes.position.array;
+            const colors = geo.attributes.color.array;
+
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                
+                // Physics: Particles "flow" toward the hand with some noise
+                positions[i3] += (targetPos.x - positions[i3]) * 0.05 + (Math.random() - 0.5) * 0.02 * spread;
+                positions[i3+1] += (targetPos.y - positions[i3+1]) * 0.05 + (Math.random() - 0.5) * 0.02 * spread;
+                
+                // Color change based on position
+                colors[i3] = Math.abs(Math.sin(Date.now() * 0.001 + i)); // Red
+                colors[i3+1] = Math.abs(targetPos.x * 0.2); // Green
+                colors[i3+2] = Math.abs(targetPos.y * 0.2); // Blue
+            }
+            
+            geo.attributes.position.needsUpdate = true;
+            geo.attributes.color.needsUpdate = true;
+            
+            points.rotation.y += 0.002;
+            renderer.render(scene, camera);
+        }
 
         animate();
     </script>
