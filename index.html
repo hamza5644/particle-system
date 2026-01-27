@@ -2,28 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Hamza's Shape Shifter</title>
+    <title>Hamza's HD Particles</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #050505; }
-        canvas { display: block; }
-        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: cyan; font-family: monospace; font-size: 20px; pointer-events: none; }
-        #debug { position: absolute; top: 10px; left: 10px; color: white; font-family: sans-serif; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;}
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        #info { position: absolute; top: 10px; left: 10px; color: cyan; font-family: monospace; font-size: 16px; pointer-events: none; z-index: 10; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; border: 1px solid #333; }
+        video { display: none; }
     </style>
 </head>
 <body>
-    <div id="loading">Loading AI Vision...</div>
-    <div id="debug">
-        State: <span id="state-display" style="color:cyan">Waiting...</span><br>
-        Fingers: <span id="finger-display">0</span>
+    <div id="info">
+        <span style="color:white; font-weight:bold;">SYSTEM READY</span><br>
+        Show Hand to Activate.<br>
+        ✊ Fist: Heart<br>
+        ☝️ Point: DNA<br>
+        ✌️ Peace: Cube<br>
+        🖐️ Open: Saturn
     </div>
-    
-    <video id="input_video" style="display:none"></video>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-    
+
     <script type="importmap">
         { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
     </script>
@@ -31,240 +30,6 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- 1. SETUP ---
-        const scene = new THREE.Scene();
-        // Add subtle fog for depth
-        scene.fog = new THREE.FogExp2(0x050505, 0.02);
-
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.z = 30;
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Performance opt
-        document.body.appendChild(renderer.domElement);
-
-        // --- 2. CREATE A GLOW TEXTURE (Procedural) ---
-        function getSprite() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 32; canvas.height = 32;
-            const context = canvas.getContext('2d');
-            const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
-            gradient.addColorStop(0, 'rgba(255,255,255,1)');
-            gradient.addColorStop(0.2, 'rgba(255,255,255,0.8)');
-            gradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
-            gradient.addColorStop(1, 'rgba(0,0,0,0)');
-            context.fillStyle = gradient;
-            context.fillRect(0, 0, 32, 32);
-            const texture = new THREE.Texture(canvas);
-            texture.needsUpdate = true;
-            return texture;
-        }
-
-        // --- 3. PARTICLE SYSTEM & SHAPES ---
-        const particleCount = 4000;
-        const geometry = new THREE.BufferGeometry();
-        const positions = new Float32Array(particleCount * 3);
-        const colors = new Float32Array(particleCount * 3);
-        
-        // We need arrays to store the "Target" positions for each shape
-        const sphereTarget = new Float32Array(particleCount * 3);
-        const heartTarget = new Float32Array(particleCount * 3);
-        const saturnTarget = new Float32Array(particleCount * 3);
-
-        // --- MATH GENERATORS ---
-        
-        // 1. Random Sphere (Cloud)
-        for (let i = 0; i < particleCount; i++) {
-            const r = 10 * Math.cbrt(Math.random());
-            const theta = Math.random() * 2 * Math.PI;
-            const phi = Math.acos(2 * Math.random() - 1);
-            sphereTarget[i*3] = r * Math.sin(phi) * Math.cos(theta);
-            sphereTarget[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-            sphereTarget[i*3+2] = r * Math.cos(phi);
-            
-            // Set initial positions
-            positions[i*3] = sphereTarget[i*3];
-            positions[i*3+1] = sphereTarget[i*3+1];
-            positions[i*3+2] = sphereTarget[i*3+2];
-        }
-
-        // 2. Heart Shape
-        for (let i = 0; i < particleCount; i++) {
-            const t = Math.random() * Math.PI * 2;
-            // Spread particles inside the volume
-            const scale = 0.5 + Math.random() * 0.5; 
-            const x = 16 * Math.pow(Math.sin(t), 3);
-            const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-            // Z depth
-            const z = (Math.random() - 0.5) * 5; 
-            
-            heartTarget[i*3] = x * scale * 0.5;
-            heartTarget[i*3+1] = y * scale * 0.5;
-            heartTarget[i*3+2] = z;
-        }
-
-        // 3. Saturn (Planet + Ring)
-        for (let i = 0; i < particleCount; i++) {
-            if (i < particleCount * 0.3) {
-                // Planet Core
-                const r = 4 * Math.cbrt(Math.random());
-                const theta = Math.random() * 2 * Math.PI;
-                const phi = Math.acos(2 * Math.random() - 1);
-                saturnTarget[i*3] = r * Math.sin(phi) * Math.cos(theta);
-                saturnTarget[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-                saturnTarget[i*3+2] = r * Math.cos(phi);
-            } else {
-                // Rings
-                const r = 6 + Math.random() * 6; // Ring radius 6 to 12
-                const theta = Math.random() * 2 * Math.PI;
-                saturnTarget[i*3] = r * Math.cos(theta);
-                saturnTarget[i*3+1] = (Math.random() - 0.5) * 0.5; // Flat Y
-                saturnTarget[i*3+2] = r * Math.sin(theta);
-            }
-        }
-
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-        const material = new THREE.PointsMaterial({
-            size: 0.8,
-            map: getSprite(), // Use the glow texture
-            vertexColors: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            transparent: true,
-            opacity: 0.8
-        });
-
-        const particles = new THREE.Points(geometry, material);
-        scene.add(particles);
-
-        // --- 4. HAND TRACKING & LOGIC ---
-        let currentTarget = sphereTarget; // Default shape
-        let handOffset = { x: 0, y: 0 };
-        let handDetected = false;
-        
-        // Colors
-        const colorHeart = new THREE.Color(0xff0055); // Red/Pink
-        const colorSaturn = new THREE.Color(0x00aaff); // Cyan/Blue
-        const colorSphere = new THREE.Color(0xffaa00); // Gold
-
-        let targetColor = colorSphere;
-
-        const videoElement = document.getElementById('input_video');
-        const stateDisplay = document.getElementById('state-display');
-        const fingerDisplay = document.getElementById('finger-display');
-
-        function onResults(results) {
-            document.getElementById('loading').style.display = 'none';
-            
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                handDetected = true;
-                const hand = results.multiHandLandmarks[0];
-                
-                // 1. Move the center based on Index Finger (8)
-                // Map 0-1 coords to World Coords (-15 to 15 approx)
-                handOffset.x = (hand[8].x - 0.5) * -30;
-                handOffset.y = (hand[8].y - 0.5) * -20;
-
-                // 2. Count Fingers (Simple logic: is tip above pip?)
-                // Tips: 4, 8, 12, 16, 20. Pips: 3, 6, 10, 14, 18
-                let fingersUp = 0;
-                // Thumb (x check)
-                if (hand[4].x < hand[3].x) fingersUp++; 
-                // Others (y check, remember y is inverted in mediapipe top-down)
-                if (hand[8].y < hand[6].y) fingersUp++;
-                if (hand[12].y < hand[10].y) fingersUp++;
-                if (hand[16].y < hand[14].y) fingersUp++;
-                if (hand[20].y < hand[18].y) fingersUp++;
-
-                fingerDisplay.innerText = fingersUp;
-
-                // 3. Switch Logic
-                if (fingersUp <= 1) {
-                    // FIST -> HEART
-                    currentTarget = heartTarget;
-                    targetColor = colorHeart;
-                    stateDisplay.innerText = "HEART (Fist)";
-                } else if (fingersUp >= 4) {
-                    // OPEN PALM -> SATURN
-                    currentTarget = saturnTarget;
-                    targetColor = colorSaturn;
-                    stateDisplay.innerText = "SATURN (Open)";
-                } else {
-                    // RELAXED -> SPHERE
-                    currentTarget = sphereTarget;
-                    targetColor = colorSphere;
-                    stateDisplay.innerText = "CLOUD (Relaxed)";
-                }
-
-            } else {
-                handDetected = false;
-                stateDisplay.innerText = "Searching...";
-            }
-        }
-
-        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-        hands.onResults(onResults);
-
-        const cameraUtils = new Camera(videoElement, {
-            onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 640, height: 480
-        });
-        cameraUtils.start();
-
-        // --- 5. ANIMATION LOOP ---
-        const clock = new THREE.Clock();
-
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            const time = clock.getElapsedTime();
-            const positionsArray = geometry.attributes.position.array;
-            const colorsArray = geometry.attributes.color.array;
-
-            // Global rotation for cool effect
-            particles.rotation.y = time * 0.1;
-            particles.rotation.z = time * 0.05;
-
-            // Lerp Logic (Morphing)
-            for (let i = 0; i < particleCount; i++) {
-                const i3 = i * 3;
-                
-                // Where does this particle want to go?
-                // Shape Target + Hand Offset
-                let targetX = currentTarget[i3] + (handDetected ? handOffset.x : 0);
-                let targetY = currentTarget[i3+1] + (handDetected ? handOffset.y : 0);
-                let targetZ = currentTarget[i3+2];
-
-                // Smoothly move 5% of the way there every frame (Lerp)
-                positionsArray[i3] += (targetX - positionsArray[i3]) * 0.08;
-                positionsArray[i3+1] += (targetY - positionsArray[i3+1]) * 0.08;
-                positionsArray[i3+2] += (targetZ - positionsArray[i3+2]) * 0.08;
-
-                // Color Morphing
-                // Mix current color with target color
-                colorsArray[i3] += (targetColor.r - colorsArray[i3]) * 0.05;
-                colorsArray[i3+1] += (targetColor.g - colorsArray[i3+1]) * 0.05;
-                colorsArray[i3+2] += (targetColor.b - colorsArray[i3+2]) * 0.05;
-            }
-
-            geometry.attributes.position.needsUpdate = true;
-            geometry.attributes.color.needsUpdate = true;
-
-            renderer.render(scene, camera);
-        }
-
-        // Handle Resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        animate();
-    </script>
-</body>
-</html>
+        // --- 1. HD TEXTURE (Base64 Spark) ---
+        // A sharp, hard-edged circle for better definition
+        const sparkTexture = new THREE.TextureLoader().load('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAHgCAYAAADwcCZJAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+/PxhSCxEAAAGYSURBVHja7NkxTxRBFIbhZwUJkMpo7IxG40/wQlMTCy208U9orY2JhZa2JhZaaOOf0MTCaDQ2SiqTkAm7M3uH2R12N7PZ2X1v8u1i9jVv8s3szu6sXq/XGq61C9iEO/C+4W+8gUfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8gQfwuOFrfIInPj6Wh8bUC9iF+/C24W+8g
