@@ -3,7 +3,7 @@
 // 1. Select the hidden video element from your HTML
 const videoElement = document.querySelector('video');
 
-// 2. Create the Camera instance (This is missing in your code!)
+// 2. Create the Camera instance 
 const camera = new Camera(videoElement, {
     onFrame: async () => {
         // This sends the current video frame to MediaPipe for processing
@@ -14,4 +14,5 @@ const camera = new Camera(videoElement, {
 });
 
 // 3. Start the camera
+
 camera.start();
