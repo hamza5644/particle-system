@@ -2,140 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Hamza's HD Particles</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hamza's Particle Morph</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
-        #info { position: absolute; top: 10px; left: 10px; color: cyan; font-family: monospace; font-size: 16px; pointer-events: none; z-index: 10; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; border: 1px solid #333; }
+        #info { 
+            position: absolute; top: 20px; left: 20px; 
+            color: #00ffff; font-family: 'Courier New', monospace; 
+            background: rgba(0, 0, 0, 0.8); padding: 15px; 
+            border: 1px solid #00ffff; border-radius: 5px;
+            pointer-events: none; z-index: 100;
+        }
         video { display: none; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
     <div id="info">
-        <span style="color:white; font-weight:bold;">SYSTEM ACTIVE</span><br>
-        Show Hand to Interact<br>
-        Status: <span id="status">Waiting...</span>
+        <b style="color:white">PARTICLE SYSTEM: ACTIVE</b><br>
+        <hr border="0" style="border-top:1px solid #333">
+        ✊ FIST: <span style="color:white">HEART</span><br>
+        ☝️ INDEX: <span style="color:white">DNA</span><br>
+        ✌️ PEACE: <span style="color:white">CUBE</span><br>
+        🖐️ OPEN: <span style="color:white">SATURN</span>
     </div>
+
     <video id="input_video"></video>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-
     <script type="importmap">
         { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
     </script>
 
-    <script type="module">
-        import * as THREE from 'three';
-
-        // --- 1. THREE.JS SCENE SETUP ---
-        const scene = new THREE.Scene();
-        const camera3D = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-        camera3D.position.z = 8;
-
-        // --- 2. INITIALIZE PARTICLES ---
-        const particleCount = 10000;
-        const geometry = new THREE.BufferGeometry();
-        const positions = new Float32Array(particleCount * 3);
-        const velocities = new Float32Array(particleCount * 3); 
-        const colors = new Float32Array(particleCount * 3);
-
-        for (let i = 0; i < particleCount * 3; i++) {
-            positions[i] = (Math.random() - 0.5) * 15;
-            velocities[i] = 0;
-            colors[i] = Math.random();
-        }
-
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        
-        const material = new THREE.PointsMaterial({ 
-            size: 0.04, 
-            vertexColors: true, 
-            transparent: true, 
-            opacity: 0.8 
-        });
-        
-        const particleSystem = new THREE.Points(geometry, material);
-        scene.add(particleSystem);
-
-        // --- 3. MEDIAPIPE HANDS SETUP ---
-        const videoElement = document.getElementById('input_video');
-        const statusEl = document.getElementById('status');
-        let targetPos = new THREE.Vector3(0, 0, 0);
-        let handVisible = false;
-
-        const hands = new Hands({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-        });
-
-        hands.setOptions({
-            maxNumHands: 1,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
-        });
-
-        hands.onResults((results) => {
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                handVisible = true;
-                statusEl.innerText = "Hand Detected";
-                const hand = results.multiHandLandmarks[0];
-                const indexTip = hand[8];
-                
-                // Better mapping for 3D depth
-                targetPos.x = (indexTip.x - 0.5) * -15; 
-                targetPos.y = (indexTip.y - 0.5) * -10;
-                targetPos.z = (indexTip.z * -10); 
-            } else {
-                handVisible = false;
-                statusEl.innerText = "Searching...";
-            }
-        });
-
-        // --- 4. ANIMATION & PHYSICS ---
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            const posAttr = geometry.attributes.position;
-            for (let i = 0; i < particleCount; i++) {
-                let ix = i * 3;
-                
-                if (handVisible) {
-                    // Pull particles toward hand on all 3 axes
-                    posAttr.array[ix] += (targetPos.x - posAttr.array[ix]) * 0.04; 
-                    posAttr.array[ix+1] += (targetPos.y - posAttr.array[ix+1]) * 0.04;
-                    posAttr.array[ix+2] += (targetPos.z - posAttr.array[ix+2]) * 0.04;
-                } else {
-                    // Gentle floating drift when no hand is present
-                    posAttr.array[ix] += Math.sin(Date.now() * 0.001 + i) * 0.005;
-                    posAttr.array[ix+1] += Math.cos(Date.now() * 0.001 + i) * 0.005;
-                }
-            }
-            posAttr.needsUpdate = true;
-            
-            particleSystem.rotation.y += 0.001;
-            renderer.render(scene, camera3D);
-        }
-        animate();
-
-        // --- 5. CAMERA INITIALIZATION ---
-        const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await hands.send({image: videoElement});
-            },
-            width: 1280,
-            height: 720
-        });
-        camera.start();
-
-        window.addEventListener('resize', () => {
-            camera3D.aspect = window.innerWidth / window.innerHeight;
-            camera3D.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>
