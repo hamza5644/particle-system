@@ -11,9 +11,9 @@
 </head>
 <body>
     <div id="info">
-        <span style="color:white; font-weight:bold;">SYSTEM READY</span><br>
-        Show Hand to Activate.<br>
-        ☝️ Point: Attract Particles
+        <span style="color:white; font-weight:bold;">SYSTEM ACTIVE</span><br>
+        Show Hand to Interact<br>
+        Status: <span id="status">Waiting...</span>
     </div>
     <video id="input_video"></video>
 
@@ -33,17 +33,18 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
-
-        camera3D.position.z = 5;
+        camera3D.position.z = 8;
 
         // --- 2. INITIALIZE PARTICLES ---
-        const particleCount = 5000;
+        const particleCount = 10000;
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(particleCount * 3);
+        const velocities = new Float32Array(particleCount * 3); 
         const colors = new Float32Array(particleCount * 3);
 
         for (let i = 0; i < particleCount * 3; i++) {
-            positions[i] = (Math.random() - 0.5) * 10;
+            positions[i] = (Math.random() - 0.5) * 15;
+            velocities[i] = 0;
             colors[i] = Math.random();
         }
 
@@ -51,7 +52,7 @@
         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
         
         const material = new THREE.PointsMaterial({ 
-            size: 0.05, 
+            size: 0.04, 
             vertexColors: true, 
             transparent: true, 
             opacity: 0.8 
@@ -62,6 +63,10 @@
 
         // --- 3. MEDIAPIPE HANDS SETUP ---
         const videoElement = document.getElementById('input_video');
+        const statusEl = document.getElementById('status');
+        let targetPos = new THREE.Vector3(0, 0, 0);
+        let handVisible = false;
+
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
@@ -75,30 +80,48 @@
 
         hands.onResults((results) => {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                handVisible = true;
+                statusEl.innerText = "Hand Detected";
                 const hand = results.multiHandLandmarks[0];
                 const indexTip = hand[8];
                 
-                // Map MediaPipe (0 to 1) to Three.js (-5 to 5)
-                const targetX = (indexTip.x - 0.5) * 10;
-                const targetY = -(indexTip.y - 0.5) * 10;
-
-                updateParticles(targetX, targetY);
+                // Better mapping for 3D depth
+                targetPos.x = (indexTip.x - 0.5) * -15; 
+                targetPos.y = (indexTip.y - 0.5) * -10;
+                targetPos.z = (indexTip.z * -10); 
+            } else {
+                handVisible = false;
+                statusEl.innerText = "Searching...";
             }
         });
 
-        // --- 4. DYNAMIC BEHAVIOR ---
-        function updateParticles(tx, ty) {
-            const posAttribute = geometry.attributes.position;
+        // --- 4. ANIMATION & PHYSICS ---
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const posAttr = geometry.attributes.position;
             for (let i = 0; i < particleCount; i++) {
                 let ix = i * 3;
-                // Simple easing movement towards the finger
-                posAttribute.array[ix] += (tx - posAttribute.array[ix]) * 0.05;
-                posAttribute.array[ix+1] += (ty - posAttribute.array[ix+1]) * 0.05;
+                
+                if (handVisible) {
+                    // Pull particles toward hand on all 3 axes
+                    posAttr.array[ix] += (targetPos.x - posAttr.array[ix]) * 0.04; 
+                    posAttr.array[ix+1] += (targetPos.y - posAttr.array[ix+1]) * 0.04;
+                    posAttr.array[ix+2] += (targetPos.z - posAttr.array[ix+2]) * 0.04;
+                } else {
+                    // Gentle floating drift when no hand is present
+                    posAttr.array[ix] += Math.sin(Date.now() * 0.001 + i) * 0.005;
+                    posAttr.array[ix+1] += Math.cos(Date.now() * 0.001 + i) * 0.005;
+                }
             }
-            posAttribute.needsUpdate = true;
+            posAttr.needsUpdate = true;
+            
+            particleSystem.rotation.y += 0.001;
+            renderer.render(scene, camera3D);
         }
+        animate();
 
-        // --- 5. CAMERA & ANIMATION LOOP ---
+        // --- 5. CAMERA INITIALIZATION ---
         const camera = new Camera(videoElement, {
             onFrame: async () => {
                 await hands.send({image: videoElement});
@@ -108,14 +131,6 @@
         });
         camera.start();
 
-        function animate() {
-            requestAnimationFrame(animate);
-            particleSystem.rotation.y += 0.002; // Subtle drift
-            renderer.render(scene, camera3D);
-        }
-        animate();
-
-        // Handle Resize
         window.addEventListener('resize', () => {
             camera3D.aspect = window.innerWidth / window.innerHeight;
             camera3D.updateProjectionMatrix();
